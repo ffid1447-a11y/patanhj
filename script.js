@@ -25,7 +25,7 @@ function createParticles() {
     function sphericalDistribution(i) {
         const phi = Math.acos(-1 + (2 * i) / count);
         const theta = Math.sqrt(count * Math.PI) * phi;
-        
+
         return {
             x: 8 * Math.cos(theta) * Math.sin(phi),
             y: 8 * Math.sin(theta) * Math.sin(phi),
@@ -34,14 +34,14 @@ function createParticles() {
     }
 
     for (let i = 0; i < count; i++) {
-        const point = sphericalDistribution(i);
-        
-        positions[i * 3] = point.x + (Math.random() - 0.5) * 0.5;
-        positions[i * 3 + 1] = point.y + (Math.random() - 0.5) * 0.5;
-        positions[i * 3 + 2] = point.z + (Math.random() - 0.5) * 0.5;
+        const p = sphericalDistribution(i);
+
+        positions[i * 3] = p.x + (Math.random() - 0.5) * 0.5;
+        positions[i * 3 + 1] = p.y + (Math.random() - 0.5) * 0.5;
+        positions[i * 3 + 2] = p.z + (Math.random() - 0.5) * 0.5;
 
         const color = new THREE.Color();
-        const depth = Math.sqrt(point.x * point.x + point.y * point.y + point.z * point.z) / 8;
+        const depth = Math.sqrt(p.x ** 2 + p.y ** 2 + p.z ** 2) / 8;
         color.setHSL(0.5 + depth * 0.2, 0.7, 0.4 + depth * 0.3);
 
         colors[i * 3] = color.r;
@@ -49,83 +49,66 @@ function createParticles() {
         colors[i * 3 + 2] = color.b;
     }
 
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
         size: 0.08,
         vertexColors: true,
-        blending: THREE.AdditiveBlending,
         transparent: true,
         opacity: 0.8,
-        sizeAttenuation: true
+        blending: THREE.AdditiveBlending
     });
 
-    if (particles) scene.remove(particles);
     particles = new THREE.Points(geometry, material);
-    particles.rotation.x = 0;
-    particles.rotation.y = 0;
-    particles.rotation.z = 0;
     scene.add(particles);
 }
 
 function setupEventListeners() {
-    const typeBtn = document.getElementById('typeBtn');
-    const input = document.getElementById('morphText');
+    const btn = document.getElementById("typeBtn");
+    const input = document.getElementById("morphText");
 
-    typeBtn.addEventListener('click', () => {
-        const text = input.value.trim();
-        if (text) {
-            morphToText(text);
-        }
+    btn.addEventListener("click", () => {
+        const t = input.value.trim();
+        if (t) morphToText(t);
     });
 
-    input.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            const text = input.value.trim();
-            if (text) {
-                morphToText(text);
-            }
+    input.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            const t = input.value.trim();
+            if (t) morphToText(t);
         }
     });
 }
 
 function createTextPoints(text) {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
     const fontSize = 100;
-    const padding = 20;
 
     ctx.font = `bold ${fontSize}px Arial`;
-    const textMetrics = ctx.measureText(text);
-    const textWidth = textMetrics.width;
-    const textHeight = fontSize;
+    const width = ctx.measureText(text).width;
 
-    canvas.width = textWidth + padding * 2;
-    canvas.height = textHeight + padding * 2;
+    canvas.width = width + 40;
+    canvas.height = fontSize + 40;
 
-    ctx.fillStyle = 'white';
     ctx.font = `bold ${fontSize}px Arial`;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
+    ctx.fillStyle = "white";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
     ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const pixels = imageData.data;
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     const points = [];
-    const threshold = 128;
 
-    for (let i = 0; i < pixels.length; i += 4) {
-        if (pixels[i] > threshold) {
+    for (let i = 0; i < data.length; i += 4) {
+        if (data[i] > 128 && Math.random() < 0.3) {
             const x = (i / 4) % canvas.width;
-            const y = Math.floor((i / 4) / canvas.width);
-            
-                if (Math.random() < 0.3) {
-                points.push({
-                    x: (x - canvas.width / 2) / (fontSize / 10),
-                    y: -(y - canvas.height / 2) / (fontSize / 10)
-                });
-            }
+            const y = Math.floor(i / 4 / canvas.width);
+            points.push({
+                x: (x - canvas.width / 2) / 10,
+                y: -(y - canvas.height / 2) / 10
+            });
         }
     }
 
@@ -133,37 +116,31 @@ function createTextPoints(text) {
 }
 
 function morphToText(text) {
-    currentState = 'text';
-    const textPoints = createTextPoints(text);
+    currentState = "text";
+    const points = createTextPoints(text);
     const positions = particles.geometry.attributes.position.array;
-    const targetPositions = new Float32Array(count * 3);
 
-    gsap.to(particles.rotation, {
-        x: 0,
-        y: 0,
-        z: 0,
-        duration: 0.5
-    });
+    const targets = new Float32Array(count * 3);
 
     for (let i = 0; i < count; i++) {
-        if (i < textPoints.length) {
-            targetPositions[i * 3] = textPoints[i].x;
-            targetPositions[i * 3 + 1] = textPoints[i].y;
-            targetPositions[i * 3 + 2] = 0;
+        if (i < points.length) {
+            targets[i * 3] = points[i].x;
+            targets[i * 3 + 1] = points[i].y;
+            targets[i * 3 + 2] = 0;
         } else {
-            const angle = Math.random() * Math.PI * 2;
-            const radius = Math.random() * 20 + 10;
-            targetPositions[i * 3] = Math.cos(angle) * radius;
-            targetPositions[i * 3 + 1] = Math.sin(angle) * radius;
-            targetPositions[i * 3 + 2] = (Math.random() - 0.5) * 10;
+            const a = Math.random() * Math.PI * 2;
+            const r = Math.random() * 20 + 10;
+            targets[i * 3] = Math.cos(a) * r;
+            targets[i * 3 + 1] = Math.sin(a) * r;
+            targets[i * 3 + 2] = (Math.random() - 0.5) * 10;
         }
     }
 
     for (let i = 0; i < positions.length; i += 3) {
-        gsap.to(particles.geometry.attributes.position.array, {
-            [i]: targetPositions[i],
-            [i + 1]: targetPositions[i + 1],
-            [i + 2]: targetPositions[i + 2],
+        gsap.to(positions, {
+            [i]: targets[i],
+            [i + 1]: targets[i + 1],
+            [i + 2]: targets[i + 2],
             duration: 2,
             ease: "power2.inOut",
             onUpdate: () => {
@@ -172,21 +149,17 @@ function morphToText(text) {
         });
     }
 
-    setTimeout(() => {
-        morphToCircle();
-    }, 4000);
+    setTimeout(() => morphToSphere(), 4000);
 }
 
-function morphToCircle() {
-    currentState = 'sphere';
+function morphToSphere() {
+    currentState = "sphere";
     const positions = particles.geometry.attributes.position.array;
-    const targetPositions = new Float32Array(count * 3);
-    const colors = particles.geometry.attributes.color.array;
+    const targets = new Float32Array(count * 3);
 
-    function sphericalDistribution(i) {
+    function distribution(i) {
         const phi = Math.acos(-1 + (2 * i) / count);
         const theta = Math.sqrt(count * Math.PI) * phi;
-        
         return {
             x: 8 * Math.cos(theta) * Math.sin(phi),
             y: 8 * Math.sin(theta) * Math.sin(phi),
@@ -195,26 +168,17 @@ function morphToCircle() {
     }
 
     for (let i = 0; i < count; i++) {
-        const point = sphericalDistribution(i);
-        
-        targetPositions[i * 3] = point.x + (Math.random() - 0.5) * 0.5;
-        targetPositions[i * 3 + 1] = point.y + (Math.random() - 0.5) * 0.5;
-        targetPositions[i * 3 + 2] = point.z + (Math.random() - 0.5) * 0.5;
-
-        const depth = Math.sqrt(point.x * point.x + point.y * point.y + point.z * point.z) / 8;
-        const color = new THREE.Color();
-        color.setHSL(0.5 + depth * 0.2, 0.7, 0.4 + depth * 0.3);
-        
-        colors[i * 3] = color.r;
-        colors[i * 3 + 1] = color.g;
-        colors[i * 3 + 2] = color.b;
+        const p = distribution(i);
+        targets[i * 3] = p.x;
+        targets[i * 3 + 1] = p.y;
+        targets[i * 3 + 2] = p.z;
     }
 
     for (let i = 0; i < positions.length; i += 3) {
-        gsap.to(particles.geometry.attributes.position.array, {
-            [i]: targetPositions[i],
-            [i + 1]: targetPositions[i + 1],
-            [i + 2]: targetPositions[i + 2],
+        gsap.to(positions, {
+            [i]: targets[i],
+            [i + 1]: targets[i + 1],
+            [i + 2]: targets[i + 2],
             duration: 2,
             ease: "power2.inOut",
             onUpdate: () => {
@@ -222,32 +186,19 @@ function morphToCircle() {
             }
         });
     }
-
-    for (let i = 0; i < colors.length; i += 3) {
-        gsap.to(particles.geometry.attributes.color.array, {
-            [i]: colors[i],
-            [i + 1]: colors[i + 1],
-            [i + 2]: colors[i + 2],
-            duration: 2,
-            ease: "power2.inOut",
-            onUpdate: () => {
-                particles.geometry.attributes.color.needsUpdate = true;
-            }
-        });
-    }
 }
 
 function animate() {
     requestAnimationFrame(animate);
-    
-    if (currentState === 'sphere') {
+
+    if (currentState === "sphere") {
         particles.rotation.y += 0.002;
     }
-    
+
     renderer.render(scene, camera);
 }
 
-window.addEventListener('resize', () => {
+window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
